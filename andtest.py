@@ -3,6 +3,7 @@ import multiprocessing as mp
 import time
 import os
 import matplotlib.pyplot as plt
+import optparse
 
 class Daemon(mp.Process):
     def __init__(self, tq, rq):
@@ -56,12 +57,13 @@ class ProcrankTest(object):
         return 'excute procranktest'
 
 class Task(mp.Process):
-    def __init__(self, tq):
+    def __init__(self, tq, time_sleep):
         mp.Process.__init__(self)
         self.tq = tq
+        self.time_sleep = time_sleep
     def run(self):
         while True:
-            time.sleep(1)
+            time.sleep(self.time_sleep)
             self.tq.put(MemTest())
             print('put memtest')
             self.tq.put(CpuTest())
@@ -90,6 +92,12 @@ class DataStore(mp.Process):
 
 
 if __name__ == '__main__':
+    usage = 'Usage: ./andtest [options]'
+    parse = optparse.OptionParser(usage = usage)
+    parse.add_option('-t', dest='time_run', default=1, type='int', help='how long you want to run the program, unit=minite, default 1')
+    parse.add_option('-s', dest='time_sleep', default=1, type='int', help= 'sampling interval you want, unit=second, default 1')
+    options, args = parse.parse_args()
+
     tasks = mp.JoinableQueue()
     results = mp.Queue()
     pin, pout = mp.Pipe()
@@ -104,12 +112,12 @@ if __name__ == '__main__':
     for w in daemons:
         w.start()
 
-    taskproc = Task(tasks)
+    taskproc = Task(tasks, options.time_sleep)
     taskproc.start()
     datastore = DataStore(results, f)
     datastore.start()
 
-    time.sleep(5)
+    time.sleep(options.time_run*60)
     taskproc.terminate()
     print('taskproc alive? %s' % taskproc.is_alive())
     taskproc.join()
